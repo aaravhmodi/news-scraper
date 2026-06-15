@@ -49,22 +49,32 @@ Separate directly stated claims from inferred framing analysis.
 Be specific. Avoid generic filler."""
 
 
-ARTICLE_PROMPT = """Analyze this article for framing.
+ARTICLE_PROMPT = """Analyze this article for news framing and media bias using the taxonomy from media bias research.
 
 Source: {source}
 Headline: {headline}
 Text:
 {text}
 
-Return JSON with:
-source, headline, summary, tone {{overall, score}}, emotional_intensity,
-emotional_language [{{phrase,effect}}],
-loaded_words [{{word,reason}}],
-main_claims [],
-blame_or_credit [{{entity, role: blamed|credited|defended, evidence}}],
-emphasized_facts [],
-possibly_omitted_context [],
-frame_label: one of economic, moral, conflict, responsibility, human impact, policy, security, uncertainty."""
+Return JSON with these fields:
+- source, headline, summary
+- tone: {{overall (string label), score (float -1 to 1)}}
+- emotional_intensity: float 0-1
+- emotional_language: [{{phrase, effect}}]
+- loaded_words: [{{word, reason}}]
+- main_claims: []
+- blame_or_credit: [{{entity, role: blamed|credited|defended, evidence}}]
+- emphasized_facts: []
+- possibly_omitted_context: []
+- frame_label: one of: economic, moral, conflict, responsibility, human impact, policy, security, uncertainty
+- spin_direction: one of: positive, negative, neutral, mixed
+- quoted_sources: [{{name, affiliation, quote_count (int), stance: supportive|critical|neutral|mixed}}] — list every named person or org directly quoted
+- detected_biases: [{{bias_type, evidence, confidence: high|medium|low}}] where bias_type is one of:
+    "coverage bias" — over/under-representation of topics or viewpoints
+    "gatekeeping bias" — selection of which facts or stories are included vs excluded
+    "statement bias" — word choice that frames facts positively or negatively
+    "spin bias" — applying a positive or negative spin to the same event
+    "ideology bias" — alignment with a political or ideological worldview"""
 
 
 COMPARISON_PROMPT = """Given the article analyses below, generate a structured BiasBuster report.
