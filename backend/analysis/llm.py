@@ -9,7 +9,7 @@ from typing import Any
 from openai import APIError, AsyncOpenAI
 from pydantic import ValidationError
 
-from backend.schemas import ArticleAnalysis, ProjectComparison
+from backend.schemas import ArticleAnalysis, DetectedBias, ProjectComparison, QuotedSource
 
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")

@@ -17,6 +17,15 @@ FrameLabel = Literal[
     "uncertainty",
 ]
 
+# Bias taxonomy from systematic review (Rodrigo-Ginés et al., 2024)
+BiasType = Literal[
+    "coverage bias",      # over/under-representing certain topics or perspectives
+    "gatekeeping bias",   # selection of which stories or facts get included
+    "statement bias",     # how claims are worded — word choice, framing of facts
+    "spin bias",          # positive or negative spin applied to the same event
+    "ideology bias",      # alignment with a political or ideological worldview
+]
+
 
 class ArticleInput(BaseModel):
     url: HttpUrl | str
@@ -49,6 +58,19 @@ class BlameCredit(BaseModel):
     evidence: str
 
 
+class QuotedSource(BaseModel):
+    name: str
+    affiliation: str = ""
+    quote_count: int = 1
+    stance: Literal["supportive", "critical", "neutral", "mixed"] = "neutral"
+
+
+class DetectedBias(BaseModel):
+    bias_type: BiasType
+    evidence: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
 class ArticleAnalysis(BaseModel):
     source: str
     headline: str
@@ -62,6 +84,9 @@ class ArticleAnalysis(BaseModel):
     emphasized_facts: list[str]
     possibly_omitted_context: list[str]
     frame_label: FrameLabel
+    quoted_sources: list[QuotedSource] = Field(default_factory=list)
+    detected_biases: list[DetectedBias] = Field(default_factory=list)
+    spin_direction: Literal["positive", "negative", "neutral", "mixed"] = "neutral"
 
 
 class FramingComparisonRow(BaseModel):
