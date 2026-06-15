@@ -64,15 +64,77 @@ class ArticleAnalysis(BaseModel):
     frame_label: FrameLabel
 
 
+class FramingComparisonRow(BaseModel):
+    source: str
+    headline: str = ""
+    main_frame: str
+    core_claim: str
+    responsible_actor_or_cause: str
+    implied_solution: str
+    evidence_used: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class HeadlineFraming(BaseModel):
+    source: str
+    headline: str
+    key_framing_words: list[str] = []
+    effect: str
+    reader_focus: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class LoadedLanguageItem(BaseModel):
+    phrase: str
+    source: str
+    framing_effect: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class SourceFramingAnalysis(BaseModel):
+    source: str
+    main_frame: str
+    tone: str
+    central_claim: str
+    supporting_evidence: list[str] = []
+    blamed_or_credited: list[str] = []
+    implied_solution: str
+    notable_wording: list[str] = []
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class EmphasisUnderemphasis(BaseModel):
+    source: str
+    emphasizes: list[str] = []
+    may_underemphasize: list[str] = []
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class CrossSourceDiagnosis(BaseModel):
+    issue_exists: str = ""
+    cause: str = ""
+    responsible_actors: str = ""
+    implied_solutions: str = ""
+    evidence_used: str = ""
+
+
 class ProjectComparison(BaseModel):
     neutral_event_summary: str
-    shared_facts: list[str]
-    source_specific_facts: list[dict[str, Any]]
-    conflicting_claims: list[dict[str, Any]]
-    framing_differences: list[dict[str, Any]]
-    headline_comparison: list[dict[str, Any]]
-    blame_credit_map: list[dict[str, Any]]
-    coverage_gaps: list[str]
+    shared_facts: list[str] = []
+    executive_insight: str = ""
+    framing_comparison_table: list[FramingComparisonRow] = []
+    headline_framing_analysis: list[HeadlineFraming] = []
+    loaded_language: list[LoadedLanguageItem] = []
+    source_by_source_analysis: list[SourceFramingAnalysis] = []
+    emphasis_underemphasis: list[EmphasisUnderemphasis] = []
+    cross_source_diagnosis: CrossSourceDiagnosis = Field(default_factory=CrossSourceDiagnosis)
+    final_biasbuster_insight: str = ""
+    source_specific_facts: list[dict[str, Any]] = []
+    conflicting_claims: list[dict[str, Any]] = []
+    framing_differences: list[dict[str, Any]] = []
+    headline_comparison: list[dict[str, Any]] = []
+    blame_credit_map: list[dict[str, Any]] = []
+    coverage_gaps: list[str] = []
 
 
 class ManualArticleUpdate(BaseModel):

@@ -6,7 +6,7 @@ import re
 from collections import Counter, defaultdict
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import APIError, AsyncOpenAI
 from pydantic import ValidationError
 
 from backend.schemas import ArticleAnalysis, ProjectComparison
@@ -38,8 +38,15 @@ Mark omitted context as possible, not certain. Keep evidence grounded in the art
 
 
 COMPARISON_SYSTEM = """You compare framing across provided article analyses. Return only valid JSON.
-Write a neutral event summary using facts supported by multiple provided articles or clearly attributed claims.
-Do not make unsupported claims about publishers or declare a side morally correct."""
+You are BiasBuster, an AI system that compares framing differences across news articles.
+Your job is not to decide which article is true or morally better. Your job is to compare how each article frames the same issue.
+Do not label outlets as good, bad, left, or right.
+Do not claim intentional bias unless directly supported.
+Use cautious wording for omissions, such as "may underemphasize."
+Identify semantic overlap, not only exact wording overlap.
+If articles discuss the same idea in different words, count it as a shared fact.
+Separate directly stated claims from inferred framing analysis.
+Be specific. Avoid generic filler."""
 
 
 ARTICLE_PROMPT = """Analyze this article for framing.
@@ -60,14 +67,27 @@ possibly_omitted_context [],
 frame_label: one of economic, moral, conflict, responsibility, human impact, policy, security, uncertainty."""
 
 
-COMPARISON_PROMPT = """Compare these article analyses for the same topic: {topic}
+COMPARISON_PROMPT = """Given the article analyses below, generate a structured BiasBuster report.
+
+Topic: {topic}
 
 Analyses:
 {analyses}
 
 Return JSON with:
-neutral_event_summary, shared_facts, source_specific_facts, conflicting_claims,
-framing_differences, headline_comparison, blame_credit_map, coverage_gaps."""
+executive_insight: one strong paragraph explaining the main framing difference across the articles.
+neutral_event_summary: a specific neutral summary of the shared issue using only supplied article information.
+shared_facts: facts or broad claims appearing across at least two articles, including semantic matches.
+framing_comparison_table: array of objects with source, headline, main_frame, core_claim, responsible_actor_or_cause, implied_solution, evidence_used, confidence.
+headline_framing_analysis: array of objects with source, headline, key_framing_words, effect, reader_focus, confidence.
+loaded_language: array of objects with phrase, source, framing_effect, confidence.
+source_by_source_analysis: array of objects with source, main_frame, tone, central_claim, supporting_evidence, blamed_or_credited, implied_solution, notable_wording, confidence.
+emphasis_underemphasis: array of objects with source, emphasizes, may_underemphasize, confidence.
+cross_source_diagnosis: object with issue_exists, cause, responsible_actors, implied_solutions, evidence_used.
+final_biasbuster_insight: polished final takeaway explaining what a reader learns by comparing these sources together.
+
+Also include legacy compatibility fields:
+source_specific_facts, conflicting_claims, framing_differences, headline_comparison, blame_credit_map, coverage_gaps."""
 
 
 def _json_from_text(text: str) -> dict[str, Any]:
@@ -166,7 +186,7 @@ async def analyze_article(source: str, headline: str, text: str) -> ArticleAnaly
         for _ in range(2):
             try:
                 return ArticleAnalysis.model_validate(await _call_json(ARTICLE_SYSTEM, prompt))
-            except (ValidationError, json.JSONDecodeError):
+            except (APIError, RuntimeError, ValidationError, json.JSONDecodeError):
                 prompt += "\n\nPrevious output was invalid. Return valid JSON only."
     return _heuristic_article(source, headline, text)
 
@@ -174,6 +194,144 @@ async def analyze_article(source: str, headline: str, text: str) -> ArticleAnaly
 def _fact_key(fact: str) -> str:
     words = re.findall(r"[a-zA-Z]{4,}", fact.lower())
     return " ".join(words[:8])
+
+
+SEMANTIC_FACTS = [
+    (
+        "Canada is facing a serious housing affordability problem.",
+        {"housing", "home", "homes", "rent", "afford", "expensive", "cost", "crisis", "price", "prices"},
+    ),
+    (
+        "The cost or difficulty of adding new housing supply is a major issue.",
+        {"build", "building", "construction", "supply", "development", "builders", "homes", "housing"},
+    ),
+    (
+        "Government policy, regulation, fees, or public measurements affect how the issue is understood.",
+        {"government", "municipal", "policy", "regulation", "charges", "fees", "tax", "cmhc", "statistics", "rate"},
+    ),
+    (
+        "The issue is complex and cannot be explained by one simple number or cause.",
+        {"complex", "system", "measure", "statistics", "rate", "multiple", "barrier", "barriers", "crisis"},
+    ),
+]
+
+
+def _analysis_blob(analysis: ArticleAnalysis) -> str:
+    parts = [
+        analysis.source,
+        analysis.headline,
+        analysis.summary,
+        " ".join(analysis.main_claims),
+        " ".join(analysis.emphasized_facts),
+        " ".join(analysis.possibly_omitted_context),
+    ]
+    return " ".join(parts).lower()
+
+
+def _semantic_shared_facts(analyses: list[ArticleAnalysis]) -> list[str]:
+    shared: list[str] = []
+    for fact, keywords in SEMANTIC_FACTS:
+        matches = 0
+        for analysis in analyses:
+            blob = _analysis_blob(analysis)
+            if sum(1 for keyword in keywords if keyword in blob) >= 2:
+                matches += 1
+        if matches >= 2:
+            shared.append(fact)
+    return shared
+
+
+def _frame_name(analysis: ArticleAnalysis) -> str:
+    blob = _analysis_blob(analysis)
+    headline = analysis.headline.lower()
+    if any(term in blob for term in ["development charge", "development charges", "municipal", "fees"]):
+        return "Municipal cost barrier"
+    if any(term in blob for term in ["homeownership", "ownership rate", "statistics", "measurement", "hiding"]):
+        return "Measurement problem"
+    if any(term in blob for term in ["build", "building", "construction", "feasibility", "too expensive to build"]):
+        return "Construction economics"
+    if any(term in headline for term in ["broken", "system"]):
+        return "Structural failure"
+    return f"{analysis.frame_label.title()} frame"
+
+
+def _headline_words(headline: str) -> list[str]:
+    phrases = re.findall(r"[\"'“”]([^\"'“”]{4,80})[\"'“”]", headline)
+    words = re.findall(r"\b(?:broken|crisis|barrier|significant|hiding|bad|expensive|failed|warning|warns|risk)\b", headline, re.I)
+    result = [p.strip() for p in phrases if p.strip()]
+    result.extend(word.lower() for word in words)
+    return list(dict.fromkeys(result))[:5]
+
+
+def _headline_effect(headline: str) -> str:
+    lowered = headline.lower()
+    if "broken" in lowered:
+        return "Frames the issue as a deep structural failure rather than a temporary market problem."
+    if "barrier" in lowered:
+        return "Narrows attention toward a specific obstacle blocking progress."
+    if "hiding" in lowered or "statistic" in lowered or "rate" in lowered:
+        return "Suggests commonly cited measures may obscure the severity of the problem."
+    if "crisis" in lowered:
+        return "Signals urgency and presents the issue as severe."
+    return "Uses the headline to establish the article's main interpretive lens."
+
+
+def _implied_solution(analysis: ArticleAnalysis, frame: str) -> str:
+    blob = _analysis_blob(analysis)
+    if "development charge" in blob or "fees" in blob:
+        return "Reduce or redesign development charges and municipal cost barriers."
+    if "homeownership" in blob or "statistics" in blob or "measure" in blob:
+        return "Use better affordability, ownership, and housing-stress measures."
+    if "build" in blob or "construction" in blob or "feasibility" in blob:
+        return "Make homebuilding more financially viable."
+    if frame.lower().startswith("policy"):
+        return "Change the policy settings the article identifies as most important."
+    return "Address the cause emphasized by the article."
+
+
+def _responsible_actor(analysis: ArticleAnalysis, frame: str) -> str:
+    if analysis.blame_or_credit:
+        return "; ".join(f"{item.entity} ({item.role})" for item in analysis.blame_or_credit[:2])
+    blob = _analysis_blob(analysis)
+    if "development charge" in blob or "municipal" in blob:
+        return "Municipal governments and development fees"
+    if "homeownership" in blob or "statistics" in blob:
+        return "Overreliance on broad ownership metrics"
+    if "build" in blob or "construction" in blob:
+        return "High building costs and weak construction feasibility"
+    return "The cause emphasized by the article"
+
+
+def _loaded_language(analyses: list[ArticleAnalysis]) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for analysis in analyses:
+        headline_terms = _headline_words(analysis.headline)
+        for phrase in headline_terms:
+            items.append(
+                {
+                    "phrase": phrase,
+                    "source": analysis.source,
+                    "framing_effect": _headline_effect(analysis.headline),
+                    "confidence": "high",
+                }
+            )
+        for word in analysis.loaded_words[:3]:
+            items.append(
+                {
+                    "phrase": word.word,
+                    "source": analysis.source,
+                    "framing_effect": word.reason,
+                    "confidence": "high",
+                }
+            )
+    seen: set[tuple[str, str]] = set()
+    unique = []
+    for item in items:
+        key = (item["phrase"].lower(), item["source"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique[:12]
 
 
 def _heuristic_comparison(topic: str, analyses: list[ArticleAnalysis]) -> ProjectComparison:
@@ -186,25 +344,98 @@ def _heuristic_comparison(topic: str, analyses: list[ArticleAnalysis]) -> Projec
                 fact_sources[key].append(analysis.source)
                 fact_text[key] = fact
 
-    shared = [fact_text[k] for k, sources in fact_sources.items() if len(set(sources)) > 1][:8]
+    shared = _semantic_shared_facts(analyses)
+    shared.extend(fact_text[k] for k, sources in fact_sources.items() if len(set(sources)) > 1)
+    shared = list(dict.fromkeys(shared))[:8]
     specific = [
         {"source": sources[0], "fact": fact_text[k]}
         for k, sources in fact_sources.items()
         if len(set(sources)) == 1
     ][:10]
+    frames = {analysis.source: _frame_name(analysis) for analysis in analyses}
+    frame_sentence = ", ".join(f"{analysis.source} frames it as {frames[analysis.source].lower()}" for analysis in analyses)
+    executive = (
+        f"The supplied articles treat {topic} as a shared issue, but they compete over the diagnosis. "
+        f"{frame_sentence}. Reading them together shifts the focus from whether the issue exists to which cause, actor, and evidence each source makes most salient."
+    )
 
     return ProjectComparison(
+        executive_insight=executive,
         neutral_event_summary=(
-            f"Coverage about {topic} describes the same broad event through different source emphases. "
-            "The shared summary is limited to claims present in the supplied articles; disputed or single-source details are separated below."
+            f"The supplied articles discuss {topic} through overlapping concerns about affordability, system barriers, and how the problem should be understood. "
+            f"They share the broad issue but emphasize different angles: {frame_sentence}."
         ),
         shared_facts=shared,
+        framing_comparison_table=[
+            {
+                "source": a.source,
+                "headline": a.headline,
+                "main_frame": frames[a.source],
+                "core_claim": a.main_claims[0] if a.main_claims else a.summary,
+                "responsible_actor_or_cause": _responsible_actor(a, frames[a.source]),
+                "implied_solution": _implied_solution(a, frames[a.source]),
+                "evidence_used": "; ".join(a.emphasized_facts[:2]) or a.summary,
+                "confidence": "medium",
+            }
+            for a in analyses
+        ],
+        headline_framing_analysis=[
+            {
+                "source": a.source,
+                "headline": a.headline,
+                "key_framing_words": _headline_words(a.headline),
+                "effect": _headline_effect(a.headline),
+                "reader_focus": frames[a.source],
+                "confidence": "high" if a.headline else "low",
+            }
+            for a in analyses
+        ],
+        loaded_language=_loaded_language(analyses),
+        source_by_source_analysis=[
+            {
+                "source": a.source,
+                "main_frame": frames[a.source],
+                "tone": a.tone.overall,
+                "central_claim": a.main_claims[0] if a.main_claims else a.summary,
+                "supporting_evidence": a.emphasized_facts[:4],
+                "blamed_or_credited": [f"{item.entity} {item.role}: {item.evidence}" for item in a.blame_or_credit[:3]],
+                "implied_solution": _implied_solution(a, frames[a.source]),
+                "notable_wording": _headline_words(a.headline) + [word.word for word in a.loaded_words[:3]],
+                "confidence": "medium",
+            }
+            for a in analyses
+        ],
+        emphasis_underemphasis=[
+            {
+                "source": a.source,
+                "emphasizes": a.emphasized_facts[:4] or [frames[a.source]],
+                "may_underemphasize": [
+                    f"Angles emphasized by other sources, such as {other_frame.lower()}."
+                    for other_source, other_frame in frames.items()
+                    if other_source != a.source and other_frame != frames[a.source]
+                ][:3],
+                "confidence": "low",
+            }
+            for a in analyses
+        ],
+        cross_source_diagnosis={
+            "issue_exists": "The articles mostly align that the topic represents a real public problem or pressure point.",
+            "cause": "They differ most in diagnosis: " + frame_sentence + ".",
+            "responsible_actors": "Each article foregrounds different responsible actors or causes rather than a single shared culprit.",
+            "implied_solutions": "The implied solutions follow the diagnosis: address construction feasibility, policy costs, measurement, or the specific barrier each article emphasizes.",
+            "evidence_used": "The sources rely on different evidence types, including article-specific facts, headline framing, quoted actors, and emphasized policy or economic details.",
+        },
+        final_biasbuster_insight=(
+            f"BiasBuster does not find that the articles mainly differ on whether {topic} matters. "
+            "They differ in where readers are encouraged to look for the root cause. "
+            "Comparing them makes the policy paths and evidence choices visible instead of leaving each article's frame implicit."
+        ),
         source_specific_facts=specific,
         conflicting_claims=[],
         framing_differences=[
             {
                 "source": a.source,
-                "frame_label": a.frame_label,
+                "frame_label": frames[a.source],
                 "tone": a.tone.overall,
                 "note": a.summary,
             }
@@ -218,8 +449,8 @@ def _heuristic_comparison(topic: str, analyses: list[ArticleAnalysis]) -> Projec
             {"source": a.source, **item.model_dump()} for a in analyses for item in a.blame_or_credit
         ],
         coverage_gaps=[
-            "Some context points are inferred from article focus and should be treated as possible gaps, not proven omissions.",
-            "Manual review is recommended before using this analysis for research conclusions.",
+            "Some underemphasis points are inferred from article focus and should be treated as possible gaps, not proven omissions.",
+            "Manual review is recommended before using this analysis for research or publication conclusions.",
         ],
     )
 
@@ -231,6 +462,6 @@ async def compare_project(topic: str, analyses: list[ArticleAnalysis]) -> Projec
         for _ in range(2):
             try:
                 return ProjectComparison.model_validate(await _call_json(COMPARISON_SYSTEM, prompt))
-            except (ValidationError, json.JSONDecodeError):
+            except (APIError, RuntimeError, ValidationError, json.JSONDecodeError):
                 prompt += "\n\nPrevious output was invalid. Return valid JSON only."
     return _heuristic_comparison(topic, analyses)

@@ -5,12 +5,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#111827",
-        paper: "#f8fafc",
-        muted: "#64748b"
+        ink: "oklch(0.22 0.035 215)",
+        paper: "oklch(0.97 0.014 180)",
+        panel: "oklch(0.995 0.004 180)",
+        line: "oklch(0.88 0.018 200)",
+        muted: "oklch(0.42 0.035 215)",
+        accent: "oklch(0.43 0.085 205)",
+        accentSoft: "oklch(0.93 0.035 200)",
+        caution: "oklch(0.57 0.11 78)"
       },
       boxShadow: {
-        soft: "0 18px 45px rgba(15, 23, 42, 0.08)"
+        soft: "0 4px 8px rgb(24 56 67 / 0.06)"
       }
     }
   },

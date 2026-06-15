@@ -13,7 +13,6 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { asText } from "@/lib/utils";
 import { exportUrl } from "@/lib/api";
 import type { Article, Project } from "@/types/biasbuster";
 import { ArticleDetailModal } from "./ArticleDetailModal";
@@ -23,6 +22,12 @@ export function ResultsDashboard({ project }: { project: Project }) {
   const [selected, setSelected] = useState<Article | null>(null);
   const analyzed = project.articles.filter((article) => article.analysis);
   const comparison = project.comparison;
+  const framingRows = comparison?.framing_comparison_table || [];
+  const headlineRows = comparison?.headline_framing_analysis || [];
+  const loadedLanguage = comparison?.loaded_language || [];
+  const sourceAnalyses = comparison?.source_by_source_analysis || [];
+  const emphasisRows = comparison?.emphasis_underemphasis || [];
+  const diagnosis = comparison?.cross_source_diagnosis;
   const points = useMemo(
     () =>
       analyzed.map((article) => ({
@@ -37,18 +42,18 @@ export function ResultsDashboard({ project }: { project: Project }) {
   );
 
   return (
-    <main className="min-h-screen px-5 py-8">
+    <main className="min-h-screen px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 md:flex-row md:items-end">
           <div>
             <Badge tone="blue">Coverage analysis</Badge>
-            <h1 className="mt-4 text-4xl font-black tracking-tight">{project.topic}</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+            <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{project.topic}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
               Interpretive framing analysis from the supplied articles. Treat possible omissions as prompts for review, not proven failures.
             </p>
           </div>
           <a
-            className="inline-flex items-center justify-center rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-white"
+            className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-paper"
             href={exportUrl(project.id)}
           >
             <Download className="mr-2 h-4 w-4" />
@@ -56,15 +61,21 @@ export function ResultsDashboard({ project }: { project: Project }) {
           </a>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="border-accent/25 bg-accentSoft/60 lg:col-span-3">
+            <h2 className="text-lg font-semibold">Executive Insight</h2>
+            <p className="mt-3 max-w-5xl text-base leading-7 text-ink">
+              {comparison?.executive_insight || "No executive insight was generated yet. At least two articles need extracted text and analysis."}
+            </p>
+          </Card>
           <Card className="lg:col-span-2">
-            <h2 className="text-xl font-bold">Neutral Summary</h2>
-            <p className="mt-3 leading-7 text-slate-700">
+            <h2 className="text-lg font-semibold">Neutral Summary</h2>
+            <p className="mt-3 leading-7 text-ink">
               {comparison?.neutral_event_summary || "No comparison was generated yet. At least one article needs extracted text and analysis."}
             </p>
           </Card>
           <Card>
-            <h2 className="text-xl font-bold">Pipeline Status</h2>
+            <h2 className="text-lg font-semibold">Pipeline Status</h2>
             <div className="mt-4 space-y-3 text-sm">
               {project.articles.map((article) => (
                 <div key={article.id} className="flex items-center justify-between gap-3">
@@ -78,9 +89,115 @@ export function ResultsDashboard({ project }: { project: Project }) {
           </Card>
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <Card className="mt-5">
+          <h2 className="text-lg font-semibold">Framing Comparison Table</h2>
+          <p className="mt-1 text-sm text-muted">The core difference is usually diagnostic: each source points the reader toward a different cause, actor, and policy path.</p>
+          <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+            <table className="w-full min-w-[1120px] text-left text-sm">
+              <thead className="bg-paper text-muted">
+                <tr>
+                  <th className="px-3 py-3">Source</th>
+                  <th className="px-3 py-3">Main Frame</th>
+                  <th className="px-3 py-3">Core Claim</th>
+                  <th className="px-3 py-3">Responsible Actor / Cause</th>
+                  <th className="px-3 py-3">Implied Solution</th>
+                  <th className="px-3 py-3">Evidence Used</th>
+                  <th className="px-3 py-3">Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {framingRows.length ? framingRows.map((row) => (
+                  <tr key={`${row.source}-${row.main_frame}`} className="border-t border-line align-top">
+                    <td className="max-w-40 px-3 py-4 font-semibold">{row.source}</td>
+                    <td className="max-w-44 px-3 py-4">{row.main_frame}</td>
+                    <td className="max-w-xs px-3 py-4 leading-6">{row.core_claim}</td>
+                    <td className="max-w-xs px-3 py-4 leading-6">{row.responsible_actor_or_cause}</td>
+                    <td className="max-w-xs px-3 py-4 leading-6">{row.implied_solution}</td>
+                    <td className="max-w-xs px-3 py-4 leading-6">{row.evidence_used}</td>
+                    <td className="px-3 py-4"><ConfidenceBadge value={row.confidence} /></td>
+                  </tr>
+                )) : (
+                  <tr><td className="py-4 text-muted" colSpan={7}>No framing table generated.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <ComparisonList title="Shared Facts" items={comparison?.shared_facts || []} />
           <Card>
-            <h2 className="text-xl font-bold">Framing Map</h2>
+            <h2 className="text-lg font-semibold">Cross-Source Diagnosis</h2>
+            {diagnosis ? (
+              <dl className="mt-4 space-y-3 text-sm leading-6 text-ink">
+                <DiagnosisItem label="Issue" value={diagnosis.issue_exists} />
+                <DiagnosisItem label="Cause" value={diagnosis.cause} />
+                <DiagnosisItem label="Responsibility" value={diagnosis.responsible_actors} />
+                <DiagnosisItem label="Solutions" value={diagnosis.implied_solutions} />
+                <DiagnosisItem label="Evidence" value={diagnosis.evidence_used} />
+              </dl>
+            ) : (
+              <p className="mt-4 text-sm text-muted">No diagnosis generated.</p>
+            )}
+          </Card>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Card>
+            <h2 className="text-lg font-semibold">Headline Framing Analysis</h2>
+            <div className="mt-4 space-y-4">
+              {headlineRows.length ? headlineRows.map((row) => (
+                <div key={`${row.source}-${row.headline}`} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{row.source}</Badge>
+                    <ConfidenceBadge value={row.confidence} />
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-ink">{row.headline}</p>
+                  <p className="mt-2 text-sm leading-6 text-ink">{row.effect}</p>
+                  <p className="mt-2 text-xs font-semibold text-muted">Focus: {row.reader_focus}</p>
+                  {row.key_framing_words.length > 0 && <p className="mt-2 text-sm text-muted">Key wording: {row.key_framing_words.join(", ")}</p>}
+                </div>
+              )) : <p className="text-sm text-muted">No headline analysis generated.</p>}
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-semibold">Loaded Language and Word Choice</h2>
+            <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead className="bg-paper text-muted">
+                  <tr>
+                    <th className="px-3 py-3">Phrase</th>
+                    <th className="px-3 py-3">Source</th>
+                    <th className="px-3 py-3">Framing Effect</th>
+                    <th className="px-3 py-3">Confidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadedLanguage.length ? loadedLanguage.map((item) => (
+                    <tr key={`${item.source}-${item.phrase}`} className="border-t border-line align-top">
+                      <td className="px-3 py-4 font-semibold">{item.phrase}</td>
+                      <td className="px-3 py-4">{item.source}</td>
+                      <td className="px-3 py-4 leading-6">{item.framing_effect}</td>
+                      <td className="px-3 py-4"><ConfidenceBadge value={item.confidence} /></td>
+                    </tr>
+                  )) : (
+                    <tr><td className="py-4 text-muted" colSpan={4}>No loaded language identified.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <SourceAnalysisList rows={sourceAnalyses} />
+          <EmphasisList rows={emphasisRows} />
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Card>
+            <h2 className="text-lg font-semibold">Framing Map</h2>
             <p className="mt-1 text-sm text-muted">X-axis: critical to supportive. Y-axis: emotional intensity.</p>
             <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -91,16 +208,16 @@ export function ResultsDashboard({ project }: { project: Project }) {
                   <Tooltip cursor={{ strokeDasharray: "3 3" }} content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const point = payload[0].payload;
-                    return <div className="max-w-xs rounded-xl bg-white p-3 text-sm shadow-soft"><b>{point.source}</b><br />{point.headline}</div>;
+                    return <div className="max-w-xs rounded-lg border border-line bg-white p-3 text-sm shadow-soft"><b>{point.source}</b><br />{point.headline}</div>;
                   }} />
-                  <Scatter data={points} fill="#2563eb" onClick={(point) => setSelected(point.article)} />
+                  <Scatter data={points} fill="oklch(0.43 0.085 205)" onClick={(point) => setSelected(point.article)} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
           <Card>
-            <h2 className="text-xl font-bold">Emotional Intensity</h2>
+            <h2 className="text-lg font-semibold">Emotional Intensity</h2>
             <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={points}>
@@ -108,61 +225,29 @@ export function ResultsDashboard({ project }: { project: Project }) {
                   <XAxis dataKey="source" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 1]} />
                   <Tooltip />
-                  <Bar dataKey="emotion" fill="#f59e0b" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="emotion" fill="oklch(0.57 0.11 78)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
         </div>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <ComparisonList title="Shared Facts" items={comparison?.shared_facts || []} />
-          <ComparisonList title="Coverage Gaps" items={comparison?.coverage_gaps || []} />
-          <ObjectList title="Headline Comparison" items={comparison?.headline_comparison || []} />
-          <ObjectList title="Blame / Credit Map" items={comparison?.blame_credit_map || []} />
-        </div>
-
         <Card className="mt-5">
-          <h2 className="text-xl font-bold">Article Comparison Table</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="text-slate-500">
-                <tr>
-                  <th className="py-3">Source</th>
-                  <th>Headline</th>
-                  <th>Tone</th>
-                  <th>Frame</th>
-                  <th>Claims</th>
-                </tr>
-              </thead>
-              <tbody>
-                {project.articles.map((article) => (
-                  <tr key={article.id} className="border-t border-slate-100 align-top">
-                    <td className="py-4 font-semibold">{article.source_name || "Unknown"}</td>
-                    <td className="max-w-xs py-4">
-                      <button className="text-left text-blue-700 hover:underline" onClick={() => setSelected(article)}>
-                        {article.headline || article.url}
-                      </button>
-                    </td>
-                    <td>{article.analysis?.tone.overall || "n/a"}</td>
-                    <td>{article.analysis?.frame_label || "n/a"}</td>
-                    <td className="max-w-md">{article.analysis?.main_claims?.slice(0, 2).join(" | ") || "No analysis"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h2 className="text-lg font-semibold">Final BiasBuster Insight</h2>
+          <p className="mt-3 max-w-5xl leading-7 text-ink">
+            {comparison?.final_biasbuster_insight || "No final insight generated."}
+          </p>
         </Card>
 
-        <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {project.articles.map((article) => (
             <Card key={article.id} className="cursor-pointer transition hover:-translate-y-0.5" onClick={() => setSelected(article)}>
               <div className="flex items-center justify-between gap-3">
                 <Badge>{article.source_name || "Unknown source"}</Badge>
                 <Badge tone={article.extraction_status === "failed" ? "red" : "green"}>{article.extraction_status}</Badge>
               </div>
-              <h3 className="mt-4 line-clamp-3 text-lg font-bold">{article.headline || "Untitled article"}</h3>
-              <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-600">{article.analysis?.summary || "No analysis available."}</p>
+              <h3 className="mt-4 line-clamp-3 text-base font-semibold leading-6">{article.headline || "Untitled article"}</h3>
+              <p className="mt-3 line-clamp-4 text-sm leading-6 text-muted">{article.analysis?.summary || "No analysis available."}</p>
             </Card>
           ))}
         </div>
@@ -175,21 +260,80 @@ export function ResultsDashboard({ project }: { project: Project }) {
 function ComparisonList({ title, items }: { title: string; items: string[] }) {
   return (
     <Card>
-      <h2 className="text-xl font-bold">{title}</h2>
-      <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <ul className="mt-4 space-y-3 text-sm leading-6 text-ink">
         {items.length ? items.map((item) => <li key={item}>- {item}</li>) : <li className="text-muted">None identified.</li>}
       </ul>
     </Card>
   );
 }
 
-function ObjectList({ title, items }: { title: string; items: Record<string, unknown>[] }) {
+function ConfidenceBadge({ value }: { value: "high" | "medium" | "low" }) {
+  const tone = value === "high" ? "green" : value === "medium" ? "amber" : "slate";
+  return <Badge tone={tone}>{value}</Badge>;
+}
+
+function DiagnosisItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-semibold text-ink">{label}</dt>
+      <dd>{value || "No comparison generated."}</dd>
+    </div>
+  );
+}
+
+function SourceAnalysisList({ rows }: { rows: NonNullable<Project["comparison"]>["source_by_source_analysis"] }) {
   return (
     <Card>
-      <h2 className="text-xl font-bold">{title}</h2>
-      <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-        {items.length ? items.map((item, index) => <p key={index} className="rounded-2xl bg-slate-50 p-3">{asText(item)}</p>) : <p className="text-muted">None identified.</p>}
+      <h2 className="text-lg font-semibold">Source-by-Source Analysis</h2>
+      <div className="mt-4 space-y-5">
+        {rows?.length ? rows.map((row) => (
+          <div key={row.source} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{row.source}</Badge>
+              <Badge tone="blue">{row.main_frame}</Badge>
+              <ConfidenceBadge value={row.confidence} />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-ink">{row.central_claim}</p>
+            <p className="mt-2 text-sm text-muted"><b className="text-ink">Implied solution:</b> {row.implied_solution}</p>
+            <MiniList label="Evidence" items={row.supporting_evidence} />
+            <MiniList label="Blame / credit" items={row.blamed_or_credited} />
+            <MiniList label="Notable wording" items={row.notable_wording} />
+          </div>
+        )) : <p className="text-sm text-muted">No source-by-source analysis generated.</p>}
       </div>
     </Card>
+  );
+}
+
+function EmphasisList({ rows }: { rows: NonNullable<Project["comparison"]>["emphasis_underemphasis"] }) {
+  return (
+    <Card>
+      <h2 className="text-lg font-semibold">Emphasis vs Underemphasis</h2>
+      <div className="mt-4 space-y-5">
+        {rows?.length ? rows.map((row) => (
+          <div key={row.source} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{row.source}</Badge>
+              <ConfidenceBadge value={row.confidence} />
+            </div>
+            <MiniList label="Emphasizes" items={row.emphasizes} />
+            <MiniList label="May underemphasize" items={row.may_underemphasize} />
+          </div>
+        )) : <p className="text-sm text-muted">No emphasis analysis generated.</p>}
+      </div>
+    </Card>
+  );
+}
+
+function MiniList({ label, items }: { label: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-3">
+      <p className="text-sm font-semibold text-ink">{label}</p>
+      <ul className="mt-1 space-y-1 text-sm leading-6 text-ink">
+        {items.map((item) => <li key={item}>- {item}</li>)}
+      </ul>
+    </div>
   );
 }

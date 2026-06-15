@@ -14,17 +14,17 @@ export function ArticleDetailModal({
   const analysis = article.analysis;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4">
       <Card className="max-h-[88vh] w-full max-w-4xl overflow-y-auto">
-        <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="mb-6 flex items-start justify-between gap-4 border-b border-line pb-5">
           <div>
             <Badge>{article.source_name || "Unknown source"}</Badge>
-            <h2 className="mt-3 text-2xl font-bold">{article.headline || "Untitled article"}</h2>
+            <h2 className="mt-3 text-2xl font-semibold leading-8">{article.headline || "Untitled article"}</h2>
             <a className="mt-2 block break-all text-sm text-blue-700" href={article.url} target="_blank">
               {article.url}
             </a>
           </div>
-          <Button className="bg-slate-200 text-slate-900 hover:bg-slate-300" onClick={onClose}>
+          <Button className="border border-line bg-white text-ink hover:bg-paper" onClick={onClose}>
             Close
           </Button>
         </div>
@@ -35,7 +35,7 @@ export function ArticleDetailModal({
           <div className="grid gap-5 md:grid-cols-2">
             <div>
               <h3 className="font-semibold">Summary</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.summary}</p>
+              <p className="mt-2 text-sm leading-6 text-ink">{analysis.summary}</p>
             </div>
             <div>
               <h3 className="font-semibold">Tone and Frame</h3>
@@ -60,7 +60,7 @@ function List({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
       <h3 className="font-semibold">{title}</h3>
-      <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+      <ul className="mt-2 space-y-2 text-sm leading-6 text-ink">
         {items.length ? items.map((item) => <li key={item}>- {item}</li>) : <li className="text-muted">No items identified.</li>}
       </ul>
     </div>

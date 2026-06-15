@@ -35,6 +35,56 @@ export type Article = {
 export type ProjectComparison = {
   neutral_event_summary: string;
   shared_facts: string[];
+  executive_insight?: string;
+  framing_comparison_table?: {
+    source: string;
+    headline: string;
+    main_frame: string;
+    core_claim: string;
+    responsible_actor_or_cause: string;
+    implied_solution: string;
+    evidence_used: string;
+    confidence: "high" | "medium" | "low";
+  }[];
+  headline_framing_analysis?: {
+    source: string;
+    headline: string;
+    key_framing_words: string[];
+    effect: string;
+    reader_focus: string;
+    confidence: "high" | "medium" | "low";
+  }[];
+  loaded_language?: {
+    phrase: string;
+    source: string;
+    framing_effect: string;
+    confidence: "high" | "medium" | "low";
+  }[];
+  source_by_source_analysis?: {
+    source: string;
+    main_frame: string;
+    tone: string;
+    central_claim: string;
+    supporting_evidence: string[];
+    blamed_or_credited: string[];
+    implied_solution: string;
+    notable_wording: string[];
+    confidence: "high" | "medium" | "low";
+  }[];
+  emphasis_underemphasis?: {
+    source: string;
+    emphasizes: string[];
+    may_underemphasize: string[];
+    confidence: "high" | "medium" | "low";
+  }[];
+  cross_source_diagnosis?: {
+    issue_exists: string;
+    cause: string;
+    responsible_actors: string;
+    implied_solutions: string;
+    evidence_used: string;
+  };
+  final_biasbuster_insight?: string;
   source_specific_facts: Record<string, unknown>[];
   conflicting_claims: Record<string, unknown>[];
   framing_differences: Record<string, unknown>[];

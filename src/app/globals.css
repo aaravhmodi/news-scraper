@@ -7,11 +7,38 @@
 }
 
 body {
-  background: #f8fafc;
-  color: #111827;
+  background: oklch(0.97 0.014 180);
+  color: oklch(0.22 0.035 215);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 textarea,
 input {
   outline: none;
+}
+
+::selection {
+  background: oklch(0.86 0.055 200);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
