@@ -3,6 +3,26 @@ export type Tone = {
   score: number;
 };
 
+export type BiasType =
+  | "coverage bias"
+  | "gatekeeping bias"
+  | "statement bias"
+  | "spin bias"
+  | "ideology bias";
+
+export type QuotedSource = {
+  name: string;
+  affiliation: string;
+  quote_count: number;
+  stance: "supportive" | "critical" | "neutral" | "mixed";
+};
+
+export type DetectedBias = {
+  bias_type: BiasType;
+  evidence: string;
+  confidence: "high" | "medium" | "low";
+};
+
 export type ArticleAnalysis = {
   source: string;
   headline: string;
@@ -16,6 +36,9 @@ export type ArticleAnalysis = {
   emphasized_facts: string[];
   possibly_omitted_context: string[];
   frame_label: string;
+  quoted_sources: QuotedSource[];
+  detected_biases: DetectedBias[];
+  spin_direction: "positive" | "negative" | "neutral" | "mixed";
 };
 
 export type Article = {

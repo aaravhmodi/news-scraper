@@ -77,7 +77,14 @@ Return JSON with these fields:
     "ideology bias" — alignment with a political or ideological worldview"""
 
 
-COMPARISON_PROMPT = """Given the article analyses below, generate a structured BiasBuster report.
+COMPARISON_PROMPT = """Given the article analyses below, generate a structured BiasBuster report using the media bias taxonomy from systematic research.
+
+Bias types to consider:
+- coverage bias: over/under-representation of topics or viewpoints
+- gatekeeping bias: which facts or stories are included vs excluded
+- statement bias: word choice that frames facts positively or negatively
+- spin bias: positive or negative spin applied to the same event
+- ideology bias: alignment with a political or ideological worldview
 
 Topic: {topic}
 
@@ -85,7 +92,7 @@ Analyses:
 {analyses}
 
 Return JSON with:
-executive_insight: one strong paragraph explaining the main framing difference across the articles.
+executive_insight: one strong paragraph explaining the main framing difference across the articles, naming specific bias types observed.
 neutral_event_summary: a specific neutral summary of the shared issue using only supplied article information.
 shared_facts: facts or broad claims appearing across at least two articles, including semantic matches.
 framing_comparison_table: array of objects with source, headline, main_frame, core_claim, responsible_actor_or_cause, implied_solution, evidence_used, confidence.
@@ -94,7 +101,7 @@ loaded_language: array of objects with phrase, source, framing_effect, confidenc
 source_by_source_analysis: array of objects with source, main_frame, tone, central_claim, supporting_evidence, blamed_or_credited, implied_solution, notable_wording, confidence.
 emphasis_underemphasis: array of objects with source, emphasizes, may_underemphasize, confidence.
 cross_source_diagnosis: object with issue_exists, cause, responsible_actors, implied_solutions, evidence_used.
-final_biasbuster_insight: polished final takeaway explaining what a reader learns by comparing these sources together.
+final_biasbuster_insight: polished final takeaway explaining what a reader learns by comparing these sources together, referencing specific bias types detected.
 
 Also include legacy compatibility fields:
 source_specific_facts, conflicting_claims, framing_differences, headline_comparison, blame_credit_map, coverage_gaps."""
@@ -171,6 +178,45 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
     elif any(w in lowered for w in ["unclear", "unknown", "may", "could"]):
         frame = "uncertainty"
 
+    # Quoted sources: heuristic extraction of named quotes
+    quote_pattern = re.compile(r'"[^"]{10,200}"\s*[,—–]\s*([A-Z][a-zA-Z\s]{2,40}?)(?:[,.]|$)', re.M)
+    quoted: list[QuotedSource] = []
+    seen_names: set[str] = set()
+    for m in quote_pattern.finditer(text):
+        name = m.group(1).strip()
+        if name not in seen_names:
+            seen_names.add(name)
+            quoted.append(QuotedSource(name=name, quote_count=1, stance="neutral"))
+
+    # Detected biases: heuristic
+    detected: list[DetectedBias] = []
+    if emotion > 0.55:
+        detected.append(DetectedBias(
+            bias_type="spin bias",
+            evidence=f"High emotional intensity ({emotion:.2f}) and loaded terms: {', '.join(found_terms[:4])}.",
+            confidence="medium",
+        ))
+    if any(w in lowered for w in ["according to", "sources say", "officials say", "experts say"]):
+        detected.append(DetectedBias(
+            bias_type="statement bias",
+            evidence="Relies on unnamed or vague attribution ('sources say', 'officials say') which can shape credibility framing.",
+            confidence="low",
+        ))
+    if len(quoted) == 1:
+        detected.append(DetectedBias(
+            bias_type="coverage bias",
+            evidence=f"Only one named source quoted ({quoted[0].name}), limiting perspective diversity.",
+            confidence="medium",
+        ))
+    if score > 0.3:
+        spin = "positive"
+    elif score < -0.3:
+        spin = "negative"
+    elif emotion > 0.4:
+        spin = "mixed"
+    else:
+        spin = "neutral"
+
     return ArticleAnalysis(
         source=source,
         headline=headline,
@@ -187,6 +233,9 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
             "Possible response from affected parties not quoted in this article.",
         ],
         frame_label=frame,  # type: ignore[arg-type]
+        quoted_sources=quoted[:8],
+        detected_biases=detected,
+        spin_direction=spin,  # type: ignore[arg-type]
     )
 
 
@@ -234,6 +283,7 @@ def _analysis_blob(analysis: ArticleAnalysis) -> str:
         " ".join(analysis.main_claims),
         " ".join(analysis.emphasized_facts),
         " ".join(analysis.possibly_omitted_context),
+        " ".join(b.evidence for b in analysis.detected_biases),
     ]
     return " ".join(parts).lower()
 

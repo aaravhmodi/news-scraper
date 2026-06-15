@@ -43,12 +43,49 @@ export function ArticleDetailModal({
                 <Badge tone="blue">{analysis.tone.overall}</Badge>
                 <Badge tone="amber">{analysis.frame_label}</Badge>
                 <Badge>emotion {analysis.emotional_intensity.toFixed(2)}</Badge>
+                {analysis.spin_direction && analysis.spin_direction !== "neutral" && (
+                  <Badge tone={analysis.spin_direction === "positive" ? "blue" : "red"}>
+                    {analysis.spin_direction} spin
+                  </Badge>
+                )}
               </div>
             </div>
             <List title="Main Claims" items={analysis.main_claims} />
             <List title="Loaded Words" items={analysis.loaded_words.map((w) => `${w.word}: ${w.reason}`)} />
             <List title="Blame / Credit" items={analysis.blame_or_credit.map((b) => `${b.entity} ${b.role}: ${b.evidence}`)} />
             <List title="Possibly Omitted Context" items={analysis.possibly_omitted_context} />
+
+            {analysis.detected_biases?.length > 0 && (
+              <div className="md:col-span-2">
+                <h3 className="font-semibold">Detected Bias Types</h3>
+                <div className="mt-2 space-y-2">
+                  {analysis.detected_biases.map((b, i) => (
+                    <div key={i} className="rounded-lg border border-line bg-paper p-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge tone="red">{b.bias_type}</Badge>
+                        <Badge>{b.confidence} confidence</Badge>
+                      </div>
+                      <p className="mt-1 text-ink">{b.evidence}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {analysis.quoted_sources?.length > 0 && (
+              <div className="md:col-span-2">
+                <h3 className="font-semibold">Quoted Sources</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {analysis.quoted_sources.map((qs, i) => (
+                    <div key={i} className="rounded border border-line bg-paper px-3 py-1.5 text-sm">
+                      <span className="font-medium">{qs.name}</span>
+                      {qs.affiliation && <span className="text-muted"> · {qs.affiliation}</span>}
+                      <span className="ml-2 text-muted">({qs.stance})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
