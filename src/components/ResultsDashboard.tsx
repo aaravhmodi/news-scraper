@@ -45,10 +45,58 @@ export function ResultsDashboard({ project }: { project: Project }) {
         headline: article.headline,
         support: article.analysis?.tone.score ?? 0,
         emotion: article.analysis?.emotional_intensity ?? 0,
+        spin: article.analysis?.spin_direction ?? "neutral",
         article
       })),
     [analyzed]
   );
+
+  // Bias type stacked bar — count detections per type per source
+  const BIAS_TYPES = ["coverage bias", "gatekeeping bias", "statement bias", "spin bias", "ideology bias"] as const;
+  const BIAS_COLORS: Record<string, string> = {
+    "coverage bias": "oklch(0.55 0.15 250)",
+    "gatekeeping bias": "oklch(0.55 0.15 30)",
+    "statement bias": "oklch(0.55 0.15 140)",
+    "spin bias": "oklch(0.55 0.15 320)",
+    "ideology bias": "oklch(0.55 0.15 60)",
+  };
+  const biasChartData = useMemo(() =>
+    analyzed.map((a) => {
+      const counts: Record<string, number> = Object.fromEntries(BIAS_TYPES.map(t => [t, 0]));
+      (a.analysis?.detected_biases ?? []).forEach(b => { counts[b.bias_type] = (counts[b.bias_type] ?? 0) + 1; });
+      return { source: a.source_name, ...counts };
+    }),
+    [analyzed]
+  );
+
+  // NRC emotion radar — one axis per emotion, one series per source
+  const EMOTION_KEYS = ["anger", "fear", "trust", "disgust", "anticipation", "joy", "sadness", "surprise"];
+  const SOURCE_COLORS = ["oklch(0.43 0.085 205)", "oklch(0.57 0.11 78)", "oklch(0.55 0.15 30)", "oklch(0.55 0.15 140)", "oklch(0.55 0.15 320)"];
+  const emotionRadarData = useMemo(() =>
+    EMOTION_KEYS.map(emotion => {
+      const row: Record<string, string | number> = { emotion };
+      analyzed.forEach(a => {
+        row[a.source_name] = (a.analysis?.emotion_scores?.[emotion] ?? 0) * 1000;
+      });
+      return row;
+    }),
+    [analyzed]
+  );
+
+  // Horizontal tone comparison bar
+  const toneData = useMemo(() =>
+    analyzed.map(a => ({
+      source: a.source_name,
+      tone: a.analysis?.tone.score ?? 0,
+      spin: a.analysis?.spin_direction ?? "neutral",
+    })),
+    [analyzed]
+  );
+
+  const spinColor = (spin: string) =>
+    spin === "positive" ? "oklch(0.55 0.15 140)" :
+    spin === "negative" ? "oklch(0.55 0.15 30)" :
+    spin === "mixed" ? "oklch(0.55 0.15 60)" : "oklch(0.5 0 0)";
 
   return (
     <main className="min-h-screen px-4 py-6 md:px-6 md:py-8">
