@@ -212,7 +212,7 @@ export function ResultsDashboard({ project }: { project: Project }) {
                   <p className="mt-2 text-sm font-semibold text-ink">{row.headline}</p>
                   <p className="mt-2 text-sm leading-6 text-ink">{row.effect}</p>
                   <p className="mt-2 text-xs font-semibold text-muted">Focus: {row.reader_focus}</p>
-                  {row.key_framing_words.length > 0 && <p className="mt-2 text-sm text-muted">Key wording: {row.key_framing_words.join(", ")}</p>}
+                  {Array.isArray(row.key_framing_words) && row.key_framing_words.length > 0 && <p className="mt-2 text-sm text-muted">Key wording: {row.key_framing_words.join(", ")}</p>}
                 </div>
               )) : <p className="text-sm text-muted">No headline analysis generated.</p>}
             </div>
