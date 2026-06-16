@@ -132,6 +132,128 @@ final_biasbuster_insight,
 source_specific_facts, conflicting_claims, framing_differences, headline_comparison, blame_credit_map, coverage_gaps.`;
 }
 
+// Coerce a value to an array — handles string, null, undefined, object
+function toArr<T>(v: unknown): T[] {
+  if (Array.isArray(v)) return v as T[];
+  if (typeof v === "string" && v.trim()) return [v as unknown as T];
+  return [];
+}
+
+function toStr(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (v == null) return fallback;
+  return String(v);
+}
+
+function toNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return isNaN(n) ? fallback : n;
+}
+
+function sanitizeArticleAnalysis(raw: Record<string, unknown>): ArticleAnalysis {
+  const tone = (raw.tone ?? {}) as Record<string, unknown>;
+  const entman = (raw.entman_functions ?? {}) as Record<string, unknown>;
+  return {
+    source: toStr(raw.source),
+    headline: toStr(raw.headline),
+    summary: toStr(raw.summary),
+    tone: { overall: toStr(tone.overall, "neutral"), score: Math.max(-1, Math.min(1, toNum(tone.score))) },
+    emotional_intensity: Math.max(0, Math.min(1, toNum(raw.emotional_intensity))),
+    emotional_language: toArr<{ phrase: string; effect: string }>(raw.emotional_language),
+    loaded_words: toArr<{ word: string; reason: string }>(raw.loaded_words),
+    main_claims: toArr<string>(raw.main_claims),
+    blame_or_credit: toArr<{ entity: string; role: string; evidence: string }>(raw.blame_or_credit),
+    emphasized_facts: toArr<string>(raw.emphasized_facts),
+    possibly_omitted_context: toArr<string>(raw.possibly_omitted_context),
+    frame_label: toStr(raw.frame_label, "policy") as ArticleAnalysis["frame_label"],
+    quoted_sources: toArr(raw.quoted_sources),
+    detected_biases: toArr<DetectedBias>(raw.detected_biases).map(b => ({
+      bias_type: b.bias_type,
+      evidence: toStr(b.evidence),
+      confidence: b.confidence ?? "medium",
+      theory: toStr(b.theory),
+      academic_reference: toStr(b.academic_reference),
+    })),
+    spin_direction: toStr(raw.spin_direction, "neutral") as ArticleAnalysis["spin_direction"],
+    entman_functions: {
+      define: toStr(entman.define),
+      diagnose: toStr(entman.diagnose),
+      evaluate: toStr(entman.evaluate),
+      recommend: toStr(entman.recommend),
+    },
+    framing_type: toStr(raw.framing_type, "mixed") as "episodic" | "thematic" | "mixed",
+    emotion_scores: typeof raw.emotion_scores === "object" && raw.emotion_scores !== null
+      ? raw.emotion_scores as Record<string, number>
+      : {},
+  };
+}
+
+function sanitizeComparison(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    executive_insight: toStr(raw.executive_insight),
+    neutral_event_summary: toStr(raw.neutral_event_summary),
+    shared_facts: toArr<string>(raw.shared_facts),
+    framing_comparison_table: toArr<Record<string, unknown>>(raw.framing_comparison_table).map(r => ({
+      source: toStr(r.source),
+      headline: toStr(r.headline),
+      main_frame: toStr(r.main_frame),
+      core_claim: toStr(r.core_claim),
+      responsible_actor_or_cause: toStr(r.responsible_actor_or_cause),
+      implied_solution: toStr(r.implied_solution),
+      evidence_used: toStr(r.evidence_used),
+      confidence: toStr(r.confidence, "medium"),
+    })),
+    headline_framing_analysis: toArr<Record<string, unknown>>(raw.headline_framing_analysis).map(r => ({
+      source: toStr(r.source),
+      headline: toStr(r.headline),
+      key_framing_words: toArr<string>(r.key_framing_words),
+      effect: toStr(r.effect),
+      reader_focus: toStr(r.reader_focus),
+      confidence: toStr(r.confidence, "medium"),
+    })),
+    loaded_language: toArr<Record<string, unknown>>(raw.loaded_language).map(r => ({
+      phrase: toStr(r.phrase),
+      source: toStr(r.source),
+      framing_effect: toStr(r.framing_effect),
+      confidence: toStr(r.confidence, "medium"),
+    })),
+    source_by_source_analysis: toArr<Record<string, unknown>>(raw.source_by_source_analysis).map(r => ({
+      source: toStr(r.source),
+      main_frame: toStr(r.main_frame),
+      tone: toStr(r.tone),
+      central_claim: toStr(r.central_claim),
+      supporting_evidence: toArr<string>(r.supporting_evidence),
+      blamed_or_credited: toArr<string>(r.blamed_or_credited),
+      implied_solution: toStr(r.implied_solution),
+      notable_wording: toArr<string>(r.notable_wording),
+      confidence: toStr(r.confidence, "medium"),
+    })),
+    emphasis_underemphasis: toArr<Record<string, unknown>>(raw.emphasis_underemphasis).map(r => ({
+      source: toStr(r.source),
+      emphasizes: toArr<string>(r.emphasizes),
+      may_underemphasize: toArr<string>(r.may_underemphasize),
+      confidence: toStr(r.confidence, "low"),
+    })),
+    cross_source_diagnosis: (() => {
+      const d = (raw.cross_source_diagnosis ?? {}) as Record<string, unknown>;
+      return {
+        issue_exists: toStr(d.issue_exists),
+        cause: toStr(d.cause),
+        responsible_actors: toStr(d.responsible_actors),
+        implied_solutions: toStr(d.implied_solutions),
+        evidence_used: toStr(d.evidence_used),
+      };
+    })(),
+    final_biasbuster_insight: toStr(raw.final_biasbuster_insight),
+    source_specific_facts: toArr(raw.source_specific_facts),
+    conflicting_claims: toArr(raw.conflicting_claims),
+    framing_differences: toArr(raw.framing_differences),
+    headline_comparison: toArr(raw.headline_comparison),
+    blame_credit_map: toArr(raw.blame_credit_map),
+    coverage_gaps: toArr<string>(raw.coverage_gaps),
+  };
+}
+
 async function callJson(system: string, prompt: string): Promise<Record<string, unknown>> {
   const c = client();
   if (!c) throw new Error("GROQ_API_KEY is not configured");
@@ -209,7 +331,7 @@ export async function analyzeArticle(source: string, headline: string, text: str
     const prompt = articlePrompt(source, headline, text, scores);
     for (let i = 0; i < 2; i++) {
       try {
-        return (await callJson(ARTICLE_SYSTEM, i === 0 ? prompt : prompt + "\n\nPrevious output was invalid. Return valid JSON only.")) as unknown as ArticleAnalysis;
+        return sanitizeArticleAnalysis(await callJson(ARTICLE_SYSTEM, i === 0 ? prompt : prompt + "\n\nPrevious output was invalid. Return valid JSON only."));
       } catch {
         // fall through to retry or heuristic
       }
@@ -224,7 +346,7 @@ export async function compareProject(topic: string, analyses: ArticleAnalysis[])
     const prompt = comparisonPrompt(topic, analyses);
     for (let i = 0; i < 2; i++) {
       try {
-        return await callJson(COMPARISON_SYSTEM, i === 0 ? prompt : prompt + "\n\nPrevious output was invalid. Return valid JSON only.");
+        return sanitizeComparison(await callJson(COMPARISON_SYSTEM, i === 0 ? prompt : prompt + "\n\nPrevious output was invalid. Return valid JSON only."));
       } catch {
         // fall through
       }

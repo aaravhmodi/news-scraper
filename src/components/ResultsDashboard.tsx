@@ -31,11 +31,12 @@ export function ResultsDashboard({ project }: { project: Project }) {
   const [selected, setSelected] = useState<Article | null>(null);
   const analyzed = project.articles.filter((article) => article.analysis);
   const comparison = project.comparison;
-  const framingRows = comparison?.framing_comparison_table || [];
-  const headlineRows = comparison?.headline_framing_analysis || [];
-  const loadedLanguage = comparison?.loaded_language || [];
-  const sourceAnalyses = comparison?.source_by_source_analysis || [];
-  const emphasisRows = comparison?.emphasis_underemphasis || [];
+  const toArr = <T,>(v: T[] | undefined | null): T[] => Array.isArray(v) ? v : [];
+  const framingRows = toArr(comparison?.framing_comparison_table);
+  const headlineRows = toArr(comparison?.headline_framing_analysis);
+  const loadedLanguage = toArr(comparison?.loaded_language);
+  const sourceAnalyses = toArr(comparison?.source_by_source_analysis);
+  const emphasisRows = toArr(comparison?.emphasis_underemphasis);
   const diagnosis = comparison?.cross_source_diagnosis;
   const points = useMemo(
     () =>
@@ -467,8 +468,8 @@ function EmphasisList({ rows }: { rows: NonNullable<Project["comparison"]>["emph
   );
 }
 
-function MiniList({ label, items }: { label: string; items: string[] }) {
-  if (!items.length) return null;
+function MiniList({ label, items }: { label: string; items: string[] | unknown }) {
+  if (!Array.isArray(items) || !items.length) return null;
   return (
     <div className="mt-3">
       <p className="text-sm font-semibold text-ink">{label}</p>
