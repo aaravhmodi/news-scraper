@@ -15,6 +15,86 @@ from backend.schemas import ArticleAnalysis, DetectedBias, EntmanFunctions, Proj
 MODEL = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
 CLIENT = AsyncOpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1") if os.getenv("GROQ_API_KEY") else None
 
+# NRC Emotion Lexicon subset (Mohammad & Turney, 2013) — word → emotion category mapping
+_NRC_LEXICON: dict[str, set[str]] = {
+    "anger": {
+        "angry", "rage", "fury", "outrage", "hostile", "aggression", "violent", "attack",
+        "conflict", "slams", "blasts", "condemns", "furious", "enraged", "wrath", "hatred",
+        "hate", "threaten", "alarming", "inflammatory", "incite", "provoke",
+    },
+    "fear": {
+        "fear", "scary", "frightening", "terrifying", "threat", "danger", "risk", "crisis",
+        "warning", "panic", "anxiety", "worried", "concern", "unsafe", "hazard", "disaster",
+        "devastating", "collapse", "catastrophe", "vulnerable", "peril",
+    },
+    "trust": {
+        "trust", "reliable", "honest", "integrity", "credible", "transparent", "accountable",
+        "legitimate", "official", "expert", "authority", "confirmed", "verified", "evidence",
+        "proven", "fact", "established", "accurate", "objective",
+    },
+    "disgust": {
+        "disgusting", "shameful", "corrupt", "scandalous", "appalling", "shocking", "disgrace",
+        "immoral", "unethical", "hypocrisy", "radical", "extreme", "controversial", "vile",
+        "obscene", "repugnant", "outrageous",
+    },
+    "anticipation": {
+        "expect", "predict", "forecast", "plan", "future", "upcoming", "potential", "possible",
+        "promise", "proposal", "goal", "hope", "intend", "aim", "project", "strategy",
+    },
+    "surprise": {
+        "unexpected", "surprising", "shocking", "sudden", "unprecedented", "historic",
+        "remarkable", "astonishing", "dramatic", "unforeseen", "revelation", "revealed",
+    },
+    "joy": {
+        "celebrate", "success", "victory", "achievement", "benefit", "improve", "progress",
+        "win", "positive", "growth", "praised", "welcomed", "triumph", "thriving",
+    },
+    "sadness": {
+        "tragic", "loss", "suffering", "victim", "devastating", "painful", "grief", "mourning",
+        "failed", "decline", "poverty", "struggle", "desperate", "hopeless", "misery",
+    },
+}
+
+# Academic bias theory reference map keyed by bias_type
+_BIAS_THEORIES: dict[str, tuple[str, str]] = {
+    "coverage bias": (
+        "Agenda-Setting Theory",
+        "McCombs, M.E. & Shaw, D.L. (1972). The agenda-setting function of mass media. "
+        "Public Opinion Quarterly, 36(2), 176–187.",
+    ),
+    "gatekeeping bias": (
+        "Gatekeeping Theory",
+        "Shoemaker, P.J. & Vos, T.P. (2009). Gatekeeping Theory. Routledge.",
+    ),
+    "statement bias": (
+        "Framing Theory (Entman)",
+        "Entman, R.M. (1993). Framing: Toward clarification of a fractured paradigm. "
+        "Journal of Communication, 43(4), 51–58.",
+    ),
+    "spin bias": (
+        "Valence Framing",
+        "Levin, I.P., Schneider, S.L. & Gaeth, G.J. (1998). All frames are not created equal: "
+        "A typology and critical analysis of framing effects. Organizational Behavior and Human "
+        "Decision Processes, 76(2), 149–188.",
+    ),
+    "ideology bias": (
+        "Media Slant Theory",
+        "Groseclose, T. & Milyo, J. (2005). A measure of media bias. "
+        "Quarterly Journal of Economics, 120(4), 1191–1237.",
+    ),
+}
+
+
+def _emotion_scores(text: str) -> dict[str, float]:
+    """Compute NRC emotion frequency scores (Mohammad & Turney, 2013)."""
+    words = re.findall(r"\b\w+\b", text.lower())
+    total = max(len(words), 1)
+    return {
+        emotion: round(sum(1 for w in words if w in word_set) / total, 4)
+        for emotion, word_set in _NRC_LEXICON.items()
+    }
+
+
 LOADED_TERMS = {
     "crisis",
     "chaos",
