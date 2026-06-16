@@ -1,5 +1,9 @@
 # BiasBuster
 
+## Demo
+
+https://github.com/aaravhmodi/news-scraper/blob/main/demo.mp4
+
 BiasBuster is a web app for comparing how different news outlets frame the same event. It goes beyond surface-level sentiment analysis — every finding is grounded in peer-reviewed communication research and explained with the academic theory behind it.
 
 It is **not** a fake-news detector and does not rate the moral value of any outlet.
