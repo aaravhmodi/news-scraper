@@ -294,25 +294,34 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
             seen_names.add(name)
             quoted.append(QuotedSource(name=name, quote_count=1, stance="neutral"))
 
-    # Detected biases: heuristic
+    # Detected biases: heuristic with academic grounding
     detected: list[DetectedBias] = []
     if emotion > 0.55:
+        theory, ref = _BIAS_THEORIES["spin bias"]
         detected.append(DetectedBias(
             bias_type="spin bias",
             evidence=f"High emotional intensity ({emotion:.2f}) and loaded terms: {', '.join(found_terms[:4])}.",
             confidence="medium",
+            theory=theory,
+            academic_reference=ref,
         ))
     if any(w in lowered for w in ["according to", "sources say", "officials say", "experts say"]):
+        theory, ref = _BIAS_THEORIES["statement bias"]
         detected.append(DetectedBias(
             bias_type="statement bias",
             evidence="Relies on unnamed or vague attribution ('sources say', 'officials say') which can shape credibility framing.",
             confidence="low",
+            theory=theory,
+            academic_reference=ref,
         ))
     if len(quoted) == 1:
+        theory, ref = _BIAS_THEORIES["coverage bias"]
         detected.append(DetectedBias(
             bias_type="coverage bias",
             evidence=f"Only one named source quoted ({quoted[0].name}), limiting perspective diversity.",
             confidence="medium",
+            theory=theory,
+            academic_reference=ref,
         ))
     if score > 0.3:
         spin = "positive"
