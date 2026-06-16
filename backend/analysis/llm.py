@@ -12,8 +12,8 @@ from pydantic import ValidationError
 from backend.schemas import ArticleAnalysis, DetectedBias, ProjectComparison, QuotedSource
 
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-CLIENT = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY")) if os.getenv("OPENAI_API_KEY") else None
+MODEL = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
+CLIENT = AsyncOpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1") if os.getenv("GROQ_API_KEY") else None
 
 LOADED_TERMS = {
     "crisis",
