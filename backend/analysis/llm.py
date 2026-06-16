@@ -151,7 +151,10 @@ Identify semantic overlap, not only exact wording. Separate stated claims from i
 Return only valid JSON. Be specific. Avoid generic filler."""
 
 
-ARTICLE_PROMPT = """Analyze this article for news framing and media bias using the taxonomy from media bias research.
+ARTICLE_PROMPT = """Analyze this article for news framing and media bias using established academic frameworks.
+
+Pre-computed NRC Emotion Lexicon scores for this article (Mohammad & Turney, 2013):
+{emotion_scores}
 
 Source: {source}
 Headline: {headline}
@@ -161,7 +164,7 @@ Text:
 Return JSON with these fields:
 - source, headline, summary
 - tone: {{overall (string label), score (float -1 to 1)}}
-- emotional_intensity: float 0-1
+- emotional_intensity: float 0-1 (calibrate against the NRC scores above)
 - emotional_language: [{{phrase, effect}}]
 - loaded_words: [{{word, reason}}]
 - main_claims: []
@@ -170,13 +173,14 @@ Return JSON with these fields:
 - possibly_omitted_context: []
 - frame_label: one of: economic, moral, conflict, responsibility, human impact, policy, security, uncertainty
 - spin_direction: one of: positive, negative, neutral, mixed
-- quoted_sources: [{{name, affiliation, quote_count (int), stance: supportive|critical|neutral|mixed}}] — list every named person or org directly quoted
-- detected_biases: [{{bias_type, evidence, confidence: high|medium|low}}] where bias_type is one of:
-    "coverage bias" — over/under-representation of topics or viewpoints
-    "gatekeeping bias" — selection of which facts or stories are included vs excluded
-    "statement bias" — word choice that frames facts positively or negatively
-    "spin bias" — applying a positive or negative spin to the same event
-    "ideology bias" — alignment with a political or ideological worldview"""
+- quoted_sources: [{{name, affiliation, quote_count (int), stance: supportive|critical|neutral|mixed}}]
+- detected_biases: [{{bias_type, evidence, confidence: high|medium|low, theory, academic_reference}}]
+    bias_type is one of: "coverage bias", "gatekeeping bias", "statement bias", "spin bias", "ideology bias"
+    theory: the academic theory name that classifies this bias (e.g. "Agenda-Setting Theory")
+    academic_reference: the canonical citation (author, year, journal)
+- entman_functions: {{define, diagnose, evaluate, recommend}} — Entman (1993) four framing functions
+- framing_type: one of: "episodic", "thematic", "mixed" — Iyengar (1991)
+- emotion_scores: the NRC emotion scores dict provided above (copy them through unchanged)"""
 
 
 COMPARISON_PROMPT = """Given the article analyses below, generate a structured BiasBuster report using the media bias taxonomy from systematic research.
