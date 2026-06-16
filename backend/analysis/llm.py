@@ -116,7 +116,7 @@ def _json_from_text(text: str) -> dict[str, Any]:
 
 async def _call_json(system: str, prompt: str) -> dict[str, Any]:
     if not CLIENT:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise RuntimeError("GROQ_API_KEY is not configured")
     response = await CLIENT.chat.completions.create(
         model=MODEL,
         temperature=0.2,
