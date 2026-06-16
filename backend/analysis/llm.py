@@ -9,7 +9,7 @@ from typing import Any
 from openai import APIError, AsyncOpenAI
 from pydantic import ValidationError
 
-from backend.schemas import ArticleAnalysis, DetectedBias, ProjectComparison, QuotedSource
+from backend.schemas import ArticleAnalysis, DetectedBias, EntmanFunctions, ProjectComparison, QuotedSource
 
 
 MODEL = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")

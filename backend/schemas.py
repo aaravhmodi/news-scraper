@@ -69,6 +69,17 @@ class DetectedBias(BaseModel):
     bias_type: BiasType
     evidence: str
     confidence: Literal["high", "medium", "low"] = "medium"
+    # Academic grounding — which theory classifies this bias and the canonical citation
+    theory: str = ""
+    academic_reference: str = ""
+
+
+class EntmanFunctions(BaseModel):
+    """Entman (1993) four framing functions — define, diagnose, evaluate, recommend."""
+    define: str = ""
+    diagnose: str = ""
+    evaluate: str = ""
+    recommend: str = ""
 
 
 class ArticleAnalysis(BaseModel):
@@ -87,6 +98,11 @@ class ArticleAnalysis(BaseModel):
     quoted_sources: list[QuotedSource] = Field(default_factory=list)
     detected_biases: list[DetectedBias] = Field(default_factory=list)
     spin_direction: Literal["positive", "negative", "neutral", "mixed"] = "neutral"
+    # Academic framing classification
+    entman_functions: EntmanFunctions = Field(default_factory=EntmanFunctions)
+    framing_type: Literal["episodic", "thematic", "mixed"] = "mixed"
+    # NRC Emotion Lexicon scores (Mohammad & Turney, 2013) — pre-computed, confirmed by LLM
+    emotion_scores: dict[str, float] = Field(default_factory=dict)
 
 
 class FramingComparisonRow(BaseModel):
