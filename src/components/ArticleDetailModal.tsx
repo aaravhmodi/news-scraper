@@ -61,14 +61,40 @@ export function ArticleDetailModal({
                 <div className="mt-2 space-y-2">
                   {analysis.detected_biases.map((b, i) => (
                     <div key={i} className="rounded-lg border border-line bg-paper p-3 text-sm">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge tone="red">{b.bias_type}</Badge>
                         <Badge>{b.confidence} confidence</Badge>
+                        {b.theory && <Badge tone="blue">{b.theory}</Badge>}
                       </div>
                       <p className="mt-1 text-ink">{b.evidence}</p>
+                      {b.academic_reference && (
+                        <p className="mt-1.5 text-xs text-muted italic">{b.academic_reference}</p>
+                      )}
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {(analysis.entman_functions?.define || analysis.framing_type) && (
+              <div className="md:col-span-2">
+                <h3 className="font-semibold">Entman Framing Functions <span className="text-xs font-normal text-muted">(Entman, 1993)</span></h3>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {(["define", "diagnose", "evaluate", "recommend"] as const).map(fn => (
+                    analysis.entman_functions?.[fn] ? (
+                      <div key={fn} className="rounded-lg border border-line bg-paper p-3 text-sm">
+                        <p className="font-semibold capitalize text-ink">{fn}</p>
+                        <p className="mt-1 text-muted">{analysis.entman_functions[fn]}</p>
+                      </div>
+                    ) : null
+                  ))}
+                </div>
+                {analysis.framing_type && (
+                  <p className="mt-2 text-sm text-muted">
+                    Framing type: <Badge>{analysis.framing_type}</Badge>
+                    <span className="ml-2 text-xs">(Iyengar, 1991)</span>
+                  </p>
+                )}
               </div>
             )}
 
