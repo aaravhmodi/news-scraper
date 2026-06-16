@@ -332,6 +332,16 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
     else:
         spin = "neutral"
 
+    scores = _emotion_scores(text)
+    # Heuristic Entman framing functions
+    entman = EntmanFunctions(
+        define=f"The article defines the issue using a {frame} frame.",
+        diagnose=blame_credit[0]["evidence"][:180] if blame_credit else "Cause not explicitly identified.",
+        evaluate="Moral or value judgment inferred from tone and loaded language.",
+        recommend="Implied solution follows from the dominant frame.",
+    )
+    framing_type: str = "thematic" if any(w in lowered for w in ["system", "policy", "structural", "broader", "overall"]) else "episodic"
+
     return ArticleAnalysis(
         source=source,
         headline=headline,
@@ -351,6 +361,9 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
         quoted_sources=quoted[:8],
         detected_biases=detected,
         spin_direction=spin,  # type: ignore[arg-type]
+        entman_functions=entman,
+        framing_type=framing_type,  # type: ignore[arg-type]
+        emotion_scores=scores,
     )
 
 
