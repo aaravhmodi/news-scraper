@@ -15,10 +15,15 @@ from backend.extractors.article_extractor import extract_article
 from backend.schemas import ArticleAnalysis, ManualArticleUpdate, ProjectCreate
 
 
+import os as _os
+
+_extra_origins = [o.strip() for o in _os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+_origins = ["http://localhost:3000", "http://127.0.0.1:3000"] + _extra_origins
+
 app = FastAPI(title="BiasBuster API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
