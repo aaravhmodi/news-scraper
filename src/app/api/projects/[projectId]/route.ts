@@ -11,10 +11,10 @@ export async function GET(_req: NextRequest, { params }: { params: { projectId: 
     const project = await fetchProject(params.projectId);
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
-    // Regenerate comparison if missing
-    const comparison = project.comparison ?? {};
+    const comparison = (project.comparison ?? {}) as Record<string, unknown>;
     if (!comparison.executive_insight || !comparison.framing_comparison_table) {
-      const validAnalyses = project.articles.map((a: { analysis: ArticleAnalysis | null }) => a.analysis).filter(Boolean) as ArticleAnalysis[];
+      const articles = (project.articles as { analysis: ArticleAnalysis | null }[]);
+      const validAnalyses = articles.map(a => a.analysis).filter(Boolean) as ArticleAnalysis[];
       if (validAnalyses.length) {
         const regenerated = await compareProject(project.topic as string, validAnalyses);
         await saveComparison(params.projectId, regenerated);

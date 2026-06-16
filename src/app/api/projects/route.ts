@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const project = await fetchProject(projectId);
     if (!project) return NextResponse.json({ error: "Project not created" }, { status: 500 });
 
-    const validAnalyses = project.articles.map((a: { analysis: ArticleAnalysis | null }) => a.analysis).filter(Boolean) as ArticleAnalysis[];
+    const validAnalyses = (project.articles as { analysis: ArticleAnalysis | null }[]).map(a => a.analysis).filter(Boolean) as ArticleAnalysis[];
     if (validAnalyses.length) {
       const comparison = await compareProject(topic, validAnalyses);
       await saveComparison(projectId, comparison);

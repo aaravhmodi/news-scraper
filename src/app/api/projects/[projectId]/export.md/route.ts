@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: { projectId: 
     ].join("\n");
   };
 
-  const cmp = (k: string) => (comparison[k] as string) ?? "";
+  const cmp = (k: string): string => (comparison[k] as string) ?? "";
   const arr = <T>(k: string) => (comparison[k] as T[]) ?? [];
 
   const lines: string[] = [

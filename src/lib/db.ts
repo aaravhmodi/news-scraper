@@ -74,14 +74,26 @@ export async function insertArticle(projectId: string, url: string, manualText?:
   return id;
 }
 
-export async function updateArticle(articleId: string, fields: Record<string, string | null>) {
+export async function updateArticle(articleId: string, fields: {
+  headline?: string | null;
+  source_name?: string | null;
+  author?: string | null;
+  published_at?: string | null;
+  raw_text?: string | null;
+  extraction_status?: string | null;
+}) {
   const db = sql();
-  const keys = Object.keys(fields);
-  if (!keys.length) return;
-  // Build the SET clause dynamically
-  const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-  const values = [articleId, ...keys.map(k => fields[k])];
-  await db(`UPDATE articles SET ${sets} WHERE id = $1`, values);
+  // COALESCE preserves existing value when the supplied value is null
+  await db`
+    UPDATE articles SET
+      headline          = COALESCE(${fields.headline          ?? null}, headline),
+      source_name       = COALESCE(${fields.source_name       ?? null}, source_name),
+      author            = COALESCE(${fields.author            ?? null}, author),
+      published_at      = COALESCE(${fields.published_at      ?? null}, published_at),
+      raw_text          = COALESCE(${fields.raw_text          ?? null}, raw_text),
+      extraction_status = COALESCE(${fields.extraction_status ?? null}, extraction_status)
+    WHERE id = ${articleId}
+  `;
 }
 
 export async function saveAnalysis(articleId: string, payload: object) {
@@ -102,7 +114,7 @@ export async function saveComparison(projectId: string, payload: object) {
   `;
 }
 
-export async function fetchProject(projectId: string) {
+export async function fetchProject(projectId: string): Promise<Record<string, unknown> | null> {
   const db = sql();
   const projects = await db`SELECT * FROM projects WHERE id = ${projectId}`;
   if (!projects.length) return null;
