@@ -21,6 +21,15 @@ export type DetectedBias = {
   bias_type: BiasType;
   evidence: string;
   confidence: "high" | "medium" | "low";
+  theory?: string;
+  academic_reference?: string;
+};
+
+export type EntmanFunctions = {
+  define: string;
+  diagnose: string;
+  evaluate: string;
+  recommend: string;
 };
 
 export type ArticleAnalysis = {
@@ -39,6 +48,9 @@ export type ArticleAnalysis = {
   quoted_sources: QuotedSource[];
   detected_biases: DetectedBias[];
   spin_direction: "positive" | "negative" | "neutral" | "mixed";
+  entman_functions?: EntmanFunctions;
+  framing_type?: "episodic" | "thematic" | "mixed";
+  emotion_scores?: Record<string, number>;
 };
 
 export type Article = {
