@@ -252,38 +252,122 @@ export function ResultsDashboard({ project }: { project: Project }) {
           <EmphasisList rows={emphasisRows} />
         </div>
 
+        {/* Charts row 1 */}
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <Card>
             <h2 className="text-lg font-semibold">Framing Map</h2>
-            <p className="mt-1 text-sm text-muted">X-axis: critical to supportive. Y-axis: emotional intensity.</p>
+            <p className="mt-1 text-sm text-muted">
+              Tone score (x) vs emotional intensity (y). Color = spin direction. Click a point to inspect.
+              <span className="ml-3 text-xs">[Entman 1993 · Levin et al. 1998]</span>
+            </p>
             <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                  <CartesianGrid />
-                  <XAxis type="number" dataKey="support" domain={[-1, 1]} name="tone" />
-                  <YAxis type="number" dataKey="emotion" domain={[0, 1]} name="emotion" />
+                <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" dataKey="support" domain={[-1, 1]} name="Tone score"
+                    label={{ value: "← Critical · Supportive →", position: "insideBottom", offset: -8, fontSize: 11 }} />
+                  <YAxis type="number" dataKey="emotion" domain={[0, 1]} name="Emotional intensity"
+                    label={{ value: "Emotional intensity", angle: -90, position: "insideLeft", fontSize: 11 }} />
+                  <ReferenceLine x={0} stroke="#999" strokeDasharray="4 4" label={{ value: "neutral", position: "top", fontSize: 10 }} />
                   <Tooltip cursor={{ strokeDasharray: "3 3" }} content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
-                    const point = payload[0].payload;
-                    return <div className="max-w-xs rounded-lg border border-line bg-white p-3 text-sm shadow-soft"><b>{point.source}</b><br />{point.headline}</div>;
+                    const p = payload[0].payload;
+                    return (
+                      <div className="max-w-xs rounded-lg border border-line bg-white p-3 text-sm shadow-soft">
+                        <b>{p.source}</b>
+                        <div className="mt-1 text-muted">{p.headline}</div>
+                        <div className="mt-1">Tone: {p.support.toFixed(2)} · Emotion: {p.emotion.toFixed(2)}</div>
+                        <div className="mt-0.5 text-xs capitalize">Spin: {p.spin}</div>
+                      </div>
+                    );
                   }} />
-                  <Scatter data={points} fill="oklch(0.43 0.085 205)" onClick={(point) => setSelected(point.article)} />
+                  {(["positive", "negative", "neutral", "mixed"] as const).map(spin => {
+                    const group = points.filter(p => p.spin === spin);
+                    if (!group.length) return null;
+                    return (
+                      <Scatter key={spin} name={spin} data={group}
+                        fill={spinColor(spin)} onClick={(p) => setSelected(p.article)}>
+                        <LabelList dataKey="source" position="top" style={{ fontSize: 10, fill: "#555" }} />
+                      </Scatter>
+                    );
+                  })}
+                  <Legend formatter={(v) => <span className="text-xs capitalize">{v} spin</span>} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
           <Card>
-            <h2 className="text-lg font-semibold">Emotional Intensity</h2>
+            <h2 className="text-lg font-semibold">Tone Comparison</h2>
+            <p className="mt-1 text-sm text-muted">
+              Tone score per source (−1 = fully critical, +1 = fully supportive). Color = spin direction.
+              <span className="ml-3 text-xs">[Levin et al. 1998 · Valence Framing]</span>
+            </p>
             <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={points}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="source" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 1]} />
-                  <Tooltip />
-                  <Bar dataKey="emotion" fill="oklch(0.57 0.11 78)" radius={[6, 6, 0, 0]} />
+                <BarChart data={toneData} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[-1, 1]}
+                    label={{ value: "← Critical · Supportive →", position: "insideBottom", offset: -2, fontSize: 11 }} />
+                  <YAxis type="category" dataKey="source" tick={{ fontSize: 11 }} width={90} />
+                  <ReferenceLine x={0} stroke="#999" strokeDasharray="4 4" />
+                  <Tooltip formatter={(v: number) => v.toFixed(2)} />
+                  <Bar dataKey="tone" radius={[0, 6, 6, 0]}>
+                    {toneData.map((entry, i) => (
+                      <Cell key={i} fill={spinColor(entry.spin)} />
+                    ))}
+                    <LabelList dataKey="tone" position="right" formatter={(v: number) => v.toFixed(2)} style={{ fontSize: 11 }} />
+                  </Bar>
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Charts row 2 */}
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Card>
+            <h2 className="text-lg font-semibold">Bias Type Profile</h2>
+            <p className="mt-1 text-sm text-muted">
+              Number of detected bias instances per type per source.
+              <span className="ml-3 text-xs">[Rodrigo-Ginés et al. 2024]</span>
+            </p>
+            <div className="mt-4 h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={biasChartData} margin={{ top: 10, right: 20, bottom: 20, left: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="source" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} label={{ value: "Detections", angle: -90, position: "insideLeft", fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {BIAS_TYPES.map(type => (
+                    <Bar key={type} dataKey={type} stackId="a" fill={BIAS_COLORS[type]} radius={type === "ideology bias" ? [4, 4, 0, 0] : undefined} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-semibold">Emotion Profile</h2>
+            <p className="mt-1 text-sm text-muted">
+              NRC Emotion Lexicon frequency scores per source. Higher = more words in that emotion category.
+              <span className="ml-3 text-xs">[Mohammad & Turney 2013]</span>
+            </p>
+            <div className="mt-4 h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={emotionRadarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="emotion" tick={{ fontSize: 11 }} />
+                  <PolarRadiusAxis tick={{ fontSize: 9 }} />
+                  {analyzed.map((a, i) => (
+                    <Radar key={a.id} name={a.source_name} dataKey={a.source_name}
+                      stroke={SOURCE_COLORS[i % SOURCE_COLORS.length]}
+                      fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} fillOpacity={0.18} />
+                  ))}
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: number) => (v / 1000).toFixed(4)} />
+                </RadarChart>
               </ResponsiveContainer>
             </div>
           </Card>
