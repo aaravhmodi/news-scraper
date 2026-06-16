@@ -347,7 +347,13 @@ def _heuristic_article(source: str, headline: str, text: str) -> ArticleAnalysis
 
 async def analyze_article(source: str, headline: str, text: str) -> ArticleAnalysis:
     if CLIENT:
-        prompt = ARTICLE_PROMPT.format(source=source, headline=headline, text=text[:14000])
+        scores = _emotion_scores(text)
+        prompt = ARTICLE_PROMPT.format(
+            source=source,
+            headline=headline,
+            text=text[:14000],
+            emotion_scores=json.dumps(scores),
+        )
         for _ in range(2):
             try:
                 return ArticleAnalysis.model_validate(await _call_json(ARTICLE_SYSTEM, prompt))
